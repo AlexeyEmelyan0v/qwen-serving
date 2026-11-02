@@ -1,0 +1,11 @@
+**
+!Dockerfile
+!requirements.txt
+!scripts/
+!scripts/download_model.py
+!scripts/entrypoint.sh
+!scripts/verify_dependencies.py
+!config/
+!config/*.json
+!runtime/
+!runtime/*.py

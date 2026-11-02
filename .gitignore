@@ -1,0 +1,10 @@
+task.docx
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.venv/
+models/
+*.log
+.test-results/
