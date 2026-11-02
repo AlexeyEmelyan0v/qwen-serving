@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qwen-config
+  namespace: qwen-serving
+data:
+  SERVED_MODEL_NAME: qwen
+  MODEL_DIR: /models/qwen
+  DTYPE: float32
+  MAX_MODEL_LEN: '1024'
+  MAX_NUM_SEQS: '1'
+  MAX_NUM_BATCHED_TOKENS: '128'
+  KV_CACHE_MEMORY_BYTES: '268435456'
+  VLLM_CPU_OMP_THREADS_BIND: nobind
+  OMP_NUM_THREADS: '4'

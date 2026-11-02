@@ -1,4 +1,4 @@
-"""Check a running Docker service without printing secrets or response text."""
+"""Check a running Docker or Kubernetes service without printing secrets or response text."""
 
 from datetime import datetime, timezone
 import json
@@ -55,8 +55,16 @@ def main():
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     since = datetime.now(timezone.utc).isoformat()
 
-    user = subprocess.check_output(
-        ["docker", "inspect", "--format", "{{.Config.User}}", container], text=True).strip()
+    kubernetes = os.environ.get("KUBERNETES_NAMESPACE")
+    if kubernetes:
+        command = ["kubectl", "--context", os.environ.get("KUBE_CONTEXT", "qwen-serving"),
+                   "-n", kubernetes]
+        user = subprocess.check_output(
+            command + ["exec", "deployment/qwen", "-c", "vllm", "--", "id", "-u"],
+            text=True).strip()
+    else:
+        user = subprocess.check_output(
+            ["docker", "inspect", "--format", "{{.Config.User}}", container], text=True).strip()
     require(user in {"app", "10001", "10001:10001", "app:app"}, "Container must use app/10001")
     require(request(opener, base + "/health")[0] == 200, "Health check failed")
     wrong_token = "wrong-" + uuid.uuid4().hex
@@ -87,8 +95,9 @@ def main():
     request(opener, base + "/" + path_marker, token)
 
     time.sleep(0.2)
-    logs = subprocess.check_output(
-        ["docker", "logs", "--since", since, container], stderr=subprocess.STDOUT, text=True)
+    log_command = (command + ["logs", "deployment/qwen", "-c", "vllm", "--since-time", since]
+                   if kubernetes else ["docker", "logs", "--since", since, container])
+    logs = subprocess.check_output(log_command, stderr=subprocess.STDOUT, text=True)
     forbidden = [token, wrong_token, marker, bad_marker, path_marker]
     if len(answer.strip()) >= 8:
         forbidden.append(answer.strip())

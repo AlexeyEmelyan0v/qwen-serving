@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen
+  namespace: qwen-serving
+spec:
+  replicas: 1
+  progressDeadlineSeconds: 3600
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: qwen
+  template:
+    metadata:
+      labels:
+        app: qwen
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: vllm
+        image: qwen-serving:dev
+        imagePullPolicy: IfNotPresent
+        args:
+        - --served-model-name
+        - $(SERVED_MODEL_NAME)
+        - --host
+        - 0.0.0.0
+        - --port
+        - '8000'
+        - --dtype
+        - $(DTYPE)
+        - --max-model-len
+        - $(MAX_MODEL_LEN)
+        - --max-num-seqs
+        - $(MAX_NUM_SEQS)
+        - --max-num-batched-tokens
+        - $(MAX_NUM_BATCHED_TOKENS)
+        - --enable-chunked-prefill
+        - --kv-cache-memory-bytes
+        - $(KV_CACHE_MEMORY_BYTES)
+        - --enforce-eager
+        envFrom:
+        - configMapRef:
+            name: qwen-config
+        env:
+        - name: VLLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: qwen-secrets
+              key: VLLM_API_KEY
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: qwen-secrets
+              key: HF_TOKEN
+        ports:
+        - name: http
+          containerPort: 8000
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: '2'
+            memory: 8Gi
+          limits:
+            cpu: '4'
+            memory: 9Gi
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 360
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 5
+        volumeMounts:
+        - name: models
+          mountPath: /models
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: qwen-models
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Gi
